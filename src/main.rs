@@ -61,6 +61,7 @@ fn play_game() -> Result<()> {
         UserCommand::AiWeak => Box::new(ai_player::AiPlayer::Weak) as Box<IsPlayer<OtherAction>>,
         UserCommand::AiMedium => Box::new(ai_player::AiPlayer::Medium) as Box<IsPlayer<OtherAction>>,
         UserCommand::AiStrong => Box::new(ai_player::AiPlayer::Strong) as Box<IsPlayer<OtherAction>>,
+        UserCommand::AiCustom => Box::new(ai_player::AiPlayer::Custom) as Box<IsPlayer<OtherAction>>,
         _ => panic!("Returned an invalid player choice"),
     };
     let mut light_human = false;
@@ -73,6 +74,7 @@ fn play_game() -> Result<()> {
         UserCommand::AiWeak => Box::new(ai_player::AiPlayer::Weak) as Box<IsPlayer<OtherAction>>,
         UserCommand::AiMedium => Box::new(ai_player::AiPlayer::Medium) as Box<IsPlayer<OtherAction>>,
         UserCommand::AiStrong => Box::new(ai_player::AiPlayer::Strong) as Box<IsPlayer<OtherAction>>,
+        UserCommand::AiCustom => Box::new(ai_player::AiPlayer::Custom) as Box<IsPlayer<OtherAction>>,
         _ => panic!("Returned an invalid player choice"),
     };
 

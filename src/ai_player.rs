@@ -50,20 +50,47 @@ pub enum AiPlayer {
     Weak,
     Medium,
     Strong,
+    Custom,
 }
 
 impl game::IsPlayer<::OtherAction> for AiPlayer {
     /// Calls `find_best_move` with suitable parameters
     fn make_move(&self, turn: &turn::Turn) -> Result<Action> {
         Ok(game::PlayerAction::Move(try!(match *self {
-                                             AiPlayer::Weak => AiPlayer::find_best_move(turn, WEAK),
-                                             AiPlayer::Medium => AiPlayer::find_best_move(turn, MEDIUM),
-                                             AiPlayer::Strong => AiPlayer::find_best_move(turn, STRONG),
-                                         })))
+            AiPlayer::Weak => AiPlayer::find_best_move(turn, WEAK),
+            AiPlayer::Medium => AiPlayer::find_best_move(turn, MEDIUM),
+            AiPlayer::Strong => AiPlayer::find_best_move(turn, STRONG),
+            AiPlayer::Custom => AiPlayer::find_best_move_custom(turn),
+        })))
     }
 }
 
 impl AiPlayer {
+    pub fn find_best_move_custom(turn: &turn::Turn) -> Result<board::Coord> {
+        // stupid AI who always attempts to move a1
+        // If everything is alright, turn shouldn't be ended
+        let side = turn.get_state()
+            .ok_or_else(|| ReversiError::EndedGame(*turn))?;
+
+        // Finds all possible legal moves and records their coordinates
+        let mut moves: Vec<Coord> = Vec::new();
+        for row in 0..board::BOARD_SIZE {
+            for col in 0..board::BOARD_SIZE {
+                let coord = board::Coord::new(row, col);
+                if turn.check_move(coord).is_ok() {
+                    moves.push(coord);
+                }
+            }
+        }
+
+        match moves.len() {
+            0 => unreachable!("Game is not ended!"), // Game can't be ended
+            1 => Ok(moves[0]), // If there is only one possible move, there's no point in evaluating it.
+            num_moves => {
+                Ok(moves[0])
+            }
+        }
+    }
     /// Find best moves among the legal ones.
     /// Each possibility is evaluated by a method depending on the value of `self` and confronted with the others.
     pub fn find_best_move(turn: &turn::Turn, comps: u32) -> Result<board::Coord> {

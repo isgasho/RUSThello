@@ -21,6 +21,7 @@ pub enum UserCommand {
     AiWeak,
     AiMedium,
     AiStrong,
+    AiCustom,
     Help,
     Credits,
     Quit,
@@ -61,6 +62,7 @@ const NEW_PLAYER_MENU: &'static str = "\th - Human Player
 \tw - Weak   AI
 \tm - Medium AI
 \ts - Strong AI
+\tc - Custom AI
 \tq - Quit match";
 
 pub fn new_player_menu() {
@@ -168,6 +170,7 @@ pub fn choose_new_player(side: Side) -> UserCommand {
             "m" | "medium" | "medium ai" => return UserCommand::AiMedium,
             "s" | "strong" | "strong ai" => return UserCommand::AiStrong,
             "q" | "quit" | "exit" => return UserCommand::Quit,
+            "c" | "custom" => return UserCommand::AiCustom,
             _ => {
                 print!("\tInvalid command! Try again: ");
                 continue;
