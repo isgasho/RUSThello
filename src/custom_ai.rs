@@ -116,7 +116,7 @@ fn ai_eval_iddfs_internal(turn: &turn::Turn, depth: usize)
         None => return Ok((Score::Ended(turn.get_score_diff()), Vec::new())),
         Some(_) if depth == 0 =>
             return Ok(
-                (Score::Running(try!(AiPlayer::heavy_eval(&turn))), Vec::new())
+                (Score::Running(try!(my_board_eval(&turn))), Vec::new())
             ),
         _ => (),
     }
@@ -151,6 +151,52 @@ fn ai_eval_iddfs_internal(turn: &turn::Turn, depth: usize)
     };
     Ok((score, line))
 }
+
+fn my_board_eval(turn: &turn::Turn) -> Result<f64> {
+    assert!(!turn.is_end_state());
+    let side = turn.get_state().unwrap();
+
+    let turns = turn.get_tempo();
+    let mut val = AiPlayer::heavy_eval(turn)?;
+    if turns <= 35 {
+        val = 0.0;
+        let mylegit = all_possible_moves(turn).len();
+        if side == Side::Light {
+            val += mylegit as f64 / 2.0;
+        } else {
+            val -= mylegit as f64 / 2.0;
+        }
+        let edges = [(0, 0, 1, 0), (7, 0, 0, 1), (0, 0, 0, 1), (0, 7, 1, 0)];
+        for &(sx, sy, dx, dy) in edges.iter() {
+            let mut white = 0;
+            let mut black = 0;
+            for i in 0 .. 8 {
+                let x = sx + i * dx;
+                let y = sy + i * dy;
+                match *(turn.get_cell(Coord::new(x, y))?) {
+                    None => (),
+                    Some(disk) => match disk.get_side() {
+                        Side::Light => white |= 1 << i,
+                        Side::Dark => black |= 1 << i,
+                    },
+                };
+            }
+            val += eval_edge(white) - eval_edge(black);
+        }
+    }
+    Ok(val)
+}
+
+fn eval_edge(pat: u8) -> f64 {
+    match pat & 0x81 {
+        0x00 => -(pat.count_ones() as f64),
+        0x01 => pat.count_ones() as f64 * 4.0,
+        0x80 => pat.count_ones() as f64 * 4.0,
+        0x81 => pat.count_ones() as f64 * 8.0,
+        _ => unreachable!(),
+    }
+}
+
 
 fn all_possible_moves(turn: &turn::Turn) -> Vec<Coord> {
     let mut moves: Vec<Coord> = Vec::new();
