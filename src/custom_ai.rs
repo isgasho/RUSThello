@@ -189,7 +189,7 @@ fn my_board_eval(turn: &turn::Turn) -> Result<f64> {
 
 fn eval_edge(pat: u8) -> f64 {
     match pat & 0x81 {
-        0x00 => -(pat.count_ones() as f64),
+        0x00 => -(pat.count_ones() as f64) - 2.0 * ((pat & 0x42).count_ones() as f64),
         0x01 => pat.count_ones() as f64 * 4.0,
         0x80 => pat.count_ones() as f64 * 4.0,
         0x81 => pat.count_ones() as f64 * 8.0,
