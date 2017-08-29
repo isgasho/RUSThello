@@ -7,7 +7,7 @@ use reversi::board::Coord;
 
 const RANDOMNESS: f64 = 0.05f64;
 
-const ENDGAME_LENGTH: usize = 12;
+const ENDGAME_LENGTH: usize = 17;
 
 fn coord_to_string(c: Coord) -> String {
     let (r, c) = c.get_row_col();
@@ -50,9 +50,7 @@ pub fn find_best_move_custom(turn: &turn::Turn) -> Result<board::Coord> {
                     depth += 1;
                 }
             } else {
-                assert!(left >= 1);
-                let depth = left - 1;
-                ai_eval_with_depth(turn, depth, &moves,
+                ai_eval_till_end(turn, &moves,
                                    &mut moves_and_scores, side);
             }
             let best_move_and_score = match side {
@@ -142,6 +140,97 @@ fn ai_eval_iddfs_internal(turn: &turn::Turn, depth: usize)
                 (line, new_score)
             }
         });
+    }
+    
+    let (line, score) = match turn.get_state() {
+        Some(Side::Dark) => scores.into_iter().min_by_key(|&(_, score)| score).expect("Why should this fail?"),
+        Some(Side::Light) => scores.into_iter().max_by_key(|&(_, score)| score).expect("Why should this fail?"),
+        None => unreachable!("turn is ended but it should not be"),
+    };
+    Ok((score, line))
+}
+
+fn ai_eval_till_end(turn: &turn::Turn, moves: &[Coord],
+                      moves_and_scores: &mut Vec<(Coord, Score)>, side: Side) {
+    let mut moves_scores_lines = Vec::new();
+    moves_and_scores.clear();
+    for &mv in moves.iter() {
+        let mut turn_after_move = *turn;
+        turn_after_move
+            .make_move(mv)
+            .expect("The move was checked, but something went wrong!");
+        let (score, line) =
+            ai_eval_till_end_internal(&turn_after_move)
+            .expect("Something went wrong with `ai_eval_till_end_internal`!");
+        moves_scores_lines.push((mv, score, line));
+        let prunable =
+            match turn.get_state() {
+                Some(Side::Dark) =>
+                    score < 0,
+                Some(Side::Light) =>
+                    score > 0,
+                None => unreachable!(),
+            };
+        if prunable {
+            break;
+        }
+    }
+    moves_scores_lines.sort_by_key(|&(_, score, _)| score);
+    if side == Side::Light {
+        moves_scores_lines.reverse();
+    }
+    eprintln!("evals[depth = {} (full)]:", 63 - turn.get_tempo());
+    for i in 0 .. ::std::cmp::min(4, moves_scores_lines.len()) {
+        let (mv, score, line) = moves_scores_lines[i].clone();
+        eprintln!("{:?}: {}{}", score, coord_to_string(mv),
+                  line_to_string(&line));
+    }
+    *moves_and_scores = moves_scores_lines.into_iter()
+        .map(|(mv, score, _)| (mv, Score::Ended(score))).collect();
+}
+
+
+
+// Check only if it's winning or not
+fn ai_eval_till_end_internal(turn: &turn::Turn)
+                    -> Result<(i16, Vec<Coord>)> {
+    match turn.get_state() {
+        None => return Ok((turn.get_score_diff(), Vec::new())),
+        _ => (),
+    }
+
+    // Finds all possible legal moves and records their coordinates
+    let mut moves: Vec<Coord>;
+    {
+        moves = all_possible_moves(turn);
+    }
+    
+    // If everything is alright, turn shouldn't be ended
+    // assert!(!turn.is_endgame());
+    
+    let mut scores: Vec<(Vec<Coord>, i16)> = Vec::new();
+    
+    while let Some(coord) = moves.pop() {
+        let mut turn_after_move = *turn;
+        turn_after_move.make_move(coord)?;
+        let (newline, new_score) = match turn_after_move.get_state() {
+            _ => {
+                let (new_score, mut line) = try!(ai_eval_till_end_internal(&turn_after_move));
+                line.push(coord);
+                (line, new_score)
+            }
+        };
+        scores.push((newline, new_score));
+        let prunable =
+            match turn.get_state() {
+                Some(Side::Dark) =>
+                    new_score < 0,
+                Some(Side::Light) => new_score > 0,
+                None => unreachable!(),
+            };
+        if prunable {
+            break;
+        }
     }
     
     let (line, score) = match turn.get_state() {
