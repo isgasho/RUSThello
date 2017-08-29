@@ -12,6 +12,7 @@ extern crate termion;
 pub mod interface;
 pub mod human_player;
 pub mod ai_player;
+pub mod custom_ai;
 
 use reversi::{ReversiError};
 use reversi::game::{PlayerAction};
