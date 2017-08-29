@@ -18,6 +18,7 @@ use rusthello_lib::{OtherAction, Result};
 use rusthello_lib::{interface, human_player, ai_player};
 use rusthello_lib::interface::{UserCommand};
 use std::cmp::Ordering;
+use std::time::{Instant};
 
 fn main() {
     // Main intro
@@ -88,24 +89,34 @@ fn play_game() -> Result<()> {
     interface::draw_board(game.get_current_turn());
 
     // Proceed with turn after turn till the game ends
+    let mut dark_time = 0.0;
+    let mut light_time = 0.0;
     while !game.is_endgame() {
         let state_side = game.get_current_state().unwrap();
-        match game.play_turn() {
+        let start = Instant::now();
+        let res = game.play_turn();
+        let end = start.elapsed();
+        let end = end.as_secs() as f64 +
+            end.subsec_nanos() as f64 * 1e-9;
+        match res {
             Ok(action) => {
                 match action {
                     PlayerAction::Move(coord) => {
                         match state_side {
                             Side::Dark => {
+                                dark_time += end;
                                 if !dark_human {
                                     interface::move_message(state_side, coord);
                                 }
                             }
                             Side::Light => {
+                                light_time += end;
                                 if !light_human {
                                     interface::move_message(state_side, coord);
                                 }
                             }
                         }
+                        println!("Time: {}s", end);
                         interface::draw_board(game.get_current_turn());
                     }
                     PlayerAction::Undo => interface::draw_board(game.get_current_turn()),
@@ -133,7 +144,8 @@ fn play_game() -> Result<()> {
                                    Ordering::Greater => Some(Side::Dark),
                                    Ordering::Less => Some(Side::Light),
                                    Ordering::Equal => None,
-                               });
+    });
+    println!("Dark: {}s, Light: {}s", dark_time, light_time);
 
     Ok(())
 }
