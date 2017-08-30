@@ -15,6 +15,10 @@ path = "src/lib.rs"
 name = "rusthello"
 path = "src/main.rs"
 
+[[bin]]
+name = "arbeval"
+path = "src/arb_eval.rs"
+
 [dependencies]
 clippy = {version = "*", optional = true}
 rand="0.3.*"

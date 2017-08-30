@@ -13,6 +13,7 @@ pub mod interface;
 pub mod human_player;
 pub mod ai_player;
 pub mod custom_ai;
+pub mod bit_board;
 
 use reversi::{ReversiError};
 use reversi::game::{PlayerAction};
