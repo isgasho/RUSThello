@@ -15,19 +15,26 @@ pub fn get_tempo(light: u64, dark: u64) -> i16 {
 }
 
 /// Port from https://github.com/koba-e964/othello-ai/blob/master/CBoard.hs
+/// disk must be a singleton.
+pub fn move_bit_board(my: u64, opp: u64, disk: u64) -> (u64, u64) {
+    assert_eq!(disk.count_ones(), 1);
+    let val = flippable_indices_set(my, opp, disk);
+    (my | val | disk, opp & !val)
+}
+
 /// set of valid moves represented by Places
 /// reference : http://code.google.com/p/edax-reversi/source/browse/src/board.c
 pub fn valid_moves_set(bl: u64, wh: u64) -> u64 {
     let mask = wh & 0x7e7e7e7e7e7e7e7e;
-    let r1 = vmSubMO(bl, mask, 1);
-    let r2 = vmSubMO(bl, wh, 8);
-    let r3 = vmSubMO(bl, mask, 7);
-    let r4 = vmSubMO(bl, mask, 9);
+    let r1 = valid_moves_set_sub(bl, mask, 1);
+    let r2 = valid_moves_set_sub(bl, wh, 8);
+    let r3 = valid_moves_set_sub(bl, mask, 7);
+    let r4 = valid_moves_set_sub(bl, mask, 9);
     (r1 | r2 | r3 | r4) & !(bl | wh)
 }
 
 
-fn vmSubMO(my: u64, mask: u64, dir: usize) -> u64 {
+fn valid_moves_set_sub(my: u64, mask: u64, dir: usize) -> u64 {
     let dir2 = dir + dir;
     let fl1 = mask & (my << dir);
     let fr1 = mask & (my >> dir);
@@ -52,7 +59,7 @@ enum Dir {
 struct Transfer(Dir, u64, usize);
 
 
-const transfers: [Transfer; 8] =
+const TRANSFERS: [Transfer; 8] =
     [Transfer(Dir::Right, 0xffffffffffffff00, 8), // up
      Transfer(Dir::Right, 0xfefefefefefefe00, 9), // up left
      Transfer(Dir::Right, 0x7f7f7f7f7f7f7f00, 7), // up right
@@ -73,38 +80,17 @@ fn trans_op(trans: Transfer, x: u64) -> u64 {
     }
 }
 
-fn reversibleSetInDir(trans: Transfer, my: u64, opp: u64) -> u64 {
-    let vacant = !(my | opp);
-    let mut opps: [u64; 6] = [0; 6];
-    let mut cur = trans_op(trans, opp);
-    for i in 0 .. 6 {
-        opps[i] = cur;
-        cur = trans_op(trans, cur);
-    }
-    let mut mys: [u64; 6] = [0; 6];
-    cur = trans_op(trans, trans_op(trans, my));
-    for i in 0 .. 6 {
-        mys[i] = cur;
-        cur = trans_op(trans, cur);
-    }
-    cur = 0;
-    for i in 0 .. 6 {
-        cur |= opps[i] & mys[i];
-    }
-    vacant & cur
-}
-
 /// disk must be a singleton
-fn flippableIndiceSet(my: u64, opp: u64, dist: u64) -> u64 {
+fn flippable_indices_set(my: u64, opp: u64, dist: u64) -> u64 {
     let mut cur = 0;
-    for &trans in transfers.iter() {
-        cur |= flippableIndicesInDir(trans, my, opp, dist);
+    for &trans in TRANSFERS.iter() {
+        cur |= flippable_indices_in_dir(trans, my, opp, dist);
     }
     cur
 }
 
 /// reference: http://ja.wikipedia.org/wiki/%E3%82%AA%E3%82%BB%E3%83%AD%E3%81%AB%E3%81%8A%E3%81%91%E3%82%8B%E3%83%93%E3%83%83%E3%83%88%E3%83%9C%E3%83%BC%E3%83%89
-fn flippableIndicesInDir(trans: Transfer, my: u64, opp: u64, disk: u64)
+fn flippable_indices_in_dir(trans: Transfer, my: u64, opp: u64, disk: u64)
     -> u64 {
     let ma = trans_op(trans, disk);
     let mut rev = 0;
@@ -123,11 +109,11 @@ fn flippableIndicesInDir(trans: Transfer, my: u64, opp: u64, disk: u64)
     }
 }
     
-const BLACK: usize = 0;
-const WHITE: usize = 1;
+pub const BLACK: usize = 0;
+pub const WHITE: usize = 1;
 
-fn countC(cb: BitBoard, color: usize) -> i16 {
-    let BitBoard(bl, wh, turn) = cb;
+pub fn count_disks(cb: BitBoard, color: usize) -> i16 {
+    let BitBoard(bl, wh, _turn) = cb;
     (if color == BLACK {
         bl.count_ones()
     } else {

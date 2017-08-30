@@ -12,14 +12,9 @@
 extern crate rusthello_lib;
 extern crate reversi;
 
-use reversi::{ReversiError, Side};
 use reversi::game::{PlayerAction, IsPlayer, Game};
-use reversi::turn::Turn;
-use reversi::board::Board;
-use rusthello_lib::{OtherAction, Result};
-use rusthello_lib::{interface, human_player, ai_player, custom_ai, bit_board};
+use rusthello_lib::{custom_ai, bit_board};
 use rusthello_lib::bit_board::BitBoard;
-use rusthello_lib::interface::{UserCommand};
 use std::cmp::Ordering;
 use std::time::{Instant};
 
@@ -53,8 +48,12 @@ fn main() {
     println!("Evaluation by custom ai");
     let board = read_board();
     println!("{}", bit_board::show_bit_board(board));
-    let BitBoard(bl, wh, turn) = board;
+    let BitBoard(bl, wh, _turn) = board;
     let valid_moves = bit_board::valid_moves_set(bl, wh);
-    println!("{}", bit_board::show_bit_board(BitBoard(valid_moves, wh, false)));
+    let pick_one = valid_moves.trailing_zeros();
+    assert!(pick_one < 64);
+    let pick_one = 1u64 << pick_one;
+    let (nbl, nwh) = bit_board::move_bit_board(bl, wh, pick_one);
+    println!("{}", bit_board::show_bit_board(BitBoard(nbl, nwh, false)));
     // custom_ai::find_best_move_custom(&turn).unwrap();
 }
