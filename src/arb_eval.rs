@@ -12,7 +12,6 @@
 extern crate rusthello_lib;
 extern crate reversi;
 
-use reversi::game::{PlayerAction, IsPlayer, Game};
 use rusthello_lib::{custom_ai, bit_board};
 use rusthello_lib::bit_board::BitBoard;
 // use std::time::{Instant};
@@ -20,7 +19,7 @@ use rusthello_lib::bit_board::BitBoard;
 fn read_board() -> bit_board::BitBoard {
     let stdin = ::std::io::stdin();
     let mut config: String = "".to_string();
-    stdin.read_line(&mut config);
+    stdin.read_line(&mut config).unwrap();
     let mut bl = 0;
     let mut wh = 0;
     if config.len() < 64 {
@@ -36,7 +35,7 @@ fn read_board() -> bit_board::BitBoard {
         }
     }
     let mut turn_config = "".to_string();
-    stdin.read_line(&mut turn_config);
+    stdin.read_line(&mut turn_config).unwrap();
     let turn = turn_config.starts_with("Black")
         || turn_config.starts_with("black");
     BitBoard(bl, wh, turn)

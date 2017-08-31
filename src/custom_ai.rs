@@ -175,9 +175,16 @@ fn ai_eval_till_end(my: u64, opp: u64, moves: u64,
     let mut moves_scores_lines = Vec::new();
     moves_and_scores.clear();
     let mut moves = moves;
+    let mut disks = Vec::with_capacity(moves.count_ones() as usize);
     while moves != 0 {
         let disk = 1u64 << moves.trailing_zeros();
         moves ^= disk;
+        let (nmy, nopp) = bit_board::move_bit_board(my, opp, disk);
+        let opp_moves = bit_board::valid_moves_set(nopp, nmy);
+        disks.push((opp_moves.count_ones(), disk));
+    }
+    disks.sort();
+    for (_, disk) in disks {
         let (nmy, nopp) = bit_board::move_bit_board(my, opp, disk);
         let (score, mut line) =
             ai_eval_till_end_internal(nopp, nmy);
@@ -217,9 +224,16 @@ fn ai_eval_till_end_internal(my: u64, opp: u64)
 
     let mut scores: Vec<(Vec<Coord>, i16)> = Vec::new();
     
+    let mut disks = Vec::with_capacity(moves.count_ones() as usize);
     while moves != 0 {
         let disk = 1u64 << moves.trailing_zeros();
         moves ^= disk;
+        let (nmy, nopp) = bit_board::move_bit_board(my, opp, disk);
+        let opp_moves = bit_board::valid_moves_set(nopp, nmy);
+        disks.push((opp_moves.count_ones(), disk));
+    }
+    disks.sort();
+    for (_, disk) in disks {
         let (nmy, nopp) = bit_board::move_bit_board(my, opp, disk);
         let (new_score, mut newline) =
             ai_eval_till_end_internal(nopp, nmy);
