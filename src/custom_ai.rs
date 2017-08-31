@@ -108,11 +108,10 @@ fn ai_eval_with_depth(my: u64, opp: u64, depth: usize, moves: u64,
         moves_scores_lines.push((disk_to_coord(disk), score, line));
     }
     moves_scores_lines.sort_by_key(|&(_, score, _)| score);
-    moves_scores_lines.reverse();
     eprintln!("evals[depth = {}]:", depth);
     for i in 0 .. ::std::cmp::min(4, moves_scores_lines.len()) {
         let (mv, score, line) = moves_scores_lines[i].clone();
-        eprintln!("{:?}: {}{}", score, coord_to_string(mv),
+        eprintln!("{:?}: {}{}", negate_score(score), coord_to_string(mv),
                   line_to_string(&line));
     }
     *moves_and_scores = moves_scores_lines.into_iter()
