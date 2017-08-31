@@ -49,11 +49,14 @@ fn main() {
     let board = read_board();
     println!("{}", bit_board::show_bit_board(board));
     let BitBoard(bl, wh, _turn) = board;
+    /*
     let valid_moves = bit_board::valid_moves_set(bl, wh);
     let pick_one = valid_moves.trailing_zeros();
     assert!(pick_one < 64);
     let pick_one = 1u64 << pick_one;
     let (nbl, nwh) = bit_board::move_bit_board(bl, wh, pick_one);
     println!("{}", bit_board::show_bit_board(BitBoard(nbl, nwh, false)));
+     */
+    custom_ai::find_best_move_bit_board(board);
     // custom_ai::find_best_move_custom(&turn).unwrap();
 }

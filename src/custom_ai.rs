@@ -1,17 +1,25 @@
 use {Result};
 use rand::thread_rng;
 use rand::distributions::{IndependentSample, Range};
-use ai_player::{AiPlayer, Score};
+use ai_player::{Score};
+
 use reversi::{board, turn, Side, ReversiError};
-use reversi::board::Coord;
+use reversi::board::{Coord};
+use bit_board;
+use bit_board::BitBoard;
 
 const RANDOMNESS: f64 = 0.05f64;
 
+const USUAL_DEPTH: usize = 5;
 const ENDGAME_LENGTH: usize = 17;
 
 fn coord_to_string(c: Coord) -> String {
     let (r, c) = c.get_row_col();
-    format!("{}{}", char::from((0x61 + c) as u8), r + 1)
+    if r >= 8 || c >= 8 {
+        "Pass".to_string()
+    } else {
+        format!("{}{}", char::from((0x61 + c) as u8), r + 1)
+    }
 }
 
 fn line_to_string(line: &[Coord]) -> String {
@@ -27,62 +35,80 @@ fn line_to_string(line: &[Coord]) -> String {
 }
 
 pub fn find_best_move_custom(turn: &turn::Turn) -> Result<board::Coord> {
-    // If everything is alright, turn shouldn't be ended
-    let side = turn.get_state()
-        .ok_or_else(|| ReversiError::EndedGame(*turn))?;
-    
+    let mut bl = 0;
+    let mut wh = 0;
+    for row in 0 .. 8 {
+        for col in 0 .. 8 {
+            let idx = row * 8 + col;
+            let cell = turn.get_cell(Coord::new(row, col))?;
+            match *cell {
+                Some(disk) => match disk.get_side() {
+                    Side::Dark => bl |= 1 << idx,
+                    Side::Light => wh |= 1 << idx,
+                },
+                None => (),
+            }
+        }
+    }
+    let is_black = turn.get_state() == Some(Side::Dark);
+    match find_best_move_bit_board(BitBoard(bl, wh, is_black)) {
+        Some(v) => Ok(v),
+        None => Err(ReversiError::EndedGame(*turn)),
+    }
+}
+pub fn find_best_move_bit_board(BitBoard(bl, wh, turn): BitBoard)
+                                           -> Option<board::Coord> {
     // Finds all possible legal moves and records their coordinates
-    let moves: Vec<Coord> = all_possible_moves(turn);
+    let my = if turn { bl } else { wh };
+    let opp = if turn { wh } else { bl };
+    let moves = bit_board::valid_moves_set(my, opp);
+    let opp_moves = bit_board::valid_moves_set(opp, my);
+    if moves == 0 && opp_moves == 0 {
+        // Game has ended.
+        return None;
+    }
     
-    match moves.len() {
-        0 => unreachable!("Game is not ended!"), // Game can't be ended
-        // 1 => Ok(moves[0]), // If there is only one possible move, there's no point in evaluating it.
+    match moves.count_ones() {
+        0 => return None,
         _num_moves => {
-            let tempo = turn.get_tempo();
+            let tempo = bit_board::get_tempo(my, opp);
             let left = (64 - tempo) as usize;
             let mut moves_and_scores = Vec::new();
             if left > ENDGAME_LENGTH {
                 // use iterative deepening
                 let mut depth = 1;
-                while depth <= 5 {
-                    ai_eval_with_depth(turn, depth, &moves,
-                                       &mut moves_and_scores, side);
+                while depth <= USUAL_DEPTH {
+                    ai_eval_with_depth(my, opp, depth, moves,
+                                       &mut moves_and_scores);
                     depth += 1;
                 }
             } else {
-                ai_eval_till_end(turn, &moves,
-                                   &mut moves_and_scores, side);
+                ai_eval_till_end(my, opp, moves,
+                                 &mut moves_and_scores);
             }
-            let best_move_and_score = match side {
-                Side::Dark =>
-                    moves_and_scores.into_iter().min_by_key(|&(_, score)| score),
-                Side::Light =>
-                    moves_and_scores.into_iter().max_by_key(|&(_, score)| score),
-            }
-            .expect("No best move found!");
-            Ok(best_move_and_score.0)
+            let best_move_and_score =
+                moves_and_scores.into_iter().min_by_key(|&(_, score)| score)
+                .expect("No best move found!");
+            Some(best_move_and_score.0)
         }
     }
 }
 
-fn ai_eval_with_depth(turn: &turn::Turn, depth: usize, moves: &[Coord],
-                      moves_and_scores: &mut Vec<(Coord, Score)>, side: Side) {
+fn ai_eval_with_depth(my: u64, opp: u64, depth: usize, moves: u64,
+                      moves_and_scores: &mut Vec<(Coord, Score)>) {
     let mut moves_scores_lines = Vec::new();
     moves_and_scores.clear();
-    for &mv in moves.iter() {
-        let mut turn_after_move = *turn;
-        turn_after_move
-            .make_move(mv)
-            .expect("The move was checked, but something went wrong!");
+    let mut restmoves = moves;
+    while restmoves != 0 {
+        let disk = 1u64 << restmoves.trailing_zeros();
+        let (nmy, nopp) = bit_board::move_bit_board(my, opp, disk);
+        restmoves ^= disk;
         let (score, line) =
-            ai_eval_iddfs(&turn_after_move, depth)
-            .expect("Something went wrong with `ai_eval_iddfs`!");
-        moves_scores_lines.push((mv, score, line));
+            ai_eval_iddfs(nopp, nmy, depth);
+        moves_scores_lines.push((disk_to_coord(disk), score, line));
     }
     moves_scores_lines.sort_by_key(|&(_, score, _)| score);
-    if side == Side::Light {
-        moves_scores_lines.reverse();
-    }
+    moves_scores_lines.reverse();
     eprintln!("evals[depth = {}]:", depth);
     for i in 0 .. ::std::cmp::min(4, moves_scores_lines.len()) {
         let (mv, score, line) = moves_scores_lines[i].clone();
@@ -93,9 +119,9 @@ fn ai_eval_with_depth(turn: &turn::Turn, depth: usize, moves: &[Coord],
         .map(|(mv, score, _)| (mv, score)).collect();
 }
 
-fn ai_eval_iddfs(turn: &turn::Turn, depth: usize)
-                 -> Result<(Score, Vec<Coord>)> {
-    let (mut score, mut line) = try!(ai_eval_iddfs_internal(turn, depth));
+fn ai_eval_iddfs(my: u64, opp: u64, depth: usize)
+                 -> (Score, Vec<Coord>) {
+    let (mut score, mut line) = ai_eval_iddfs_internal(my, opp, depth);
     // Add some randomness
     let between = Range::new(-RANDOMNESS, RANDOMNESS);
     let mut rng = thread_rng();
@@ -105,84 +131,67 @@ fn ai_eval_iddfs(turn: &turn::Turn, depth: usize)
     };
     // Done, return
     line.reverse(); // the last move is pushed first
-    Ok((score, line))
+    (score, line)
 }
 
-fn ai_eval_iddfs_internal(turn: &turn::Turn, depth: usize)
-                          -> Result<(Score, Vec<Coord>)> {
-    match turn.get_state() {
-        None => return Ok((Score::Ended(turn.get_score_diff()), Vec::new())),
-        Some(_) if depth == 0 =>
-            return Ok(
-                (Score::Running(try!(my_board_eval(&turn))), Vec::new())
-            ),
-        _ => (),
+fn ai_eval_iddfs_internal(my: u64, opp: u64, depth: usize)
+                          -> (Score, Vec<Coord>) {
+    let mut moves = bit_board::valid_moves_set(my, opp);
+    let oppmoves = bit_board::valid_moves_set(opp, my);
+    if moves == 0 && oppmoves == 0 {
+        return (Score::Ended(get_score_diff(my, opp)), Vec::new());
+    }
+    if depth == 0 {
+        return
+            (Score::Running(my_board_eval(my, opp)), Vec::new());
     }
 
-    // Finds all possible legal moves and records their coordinates
-    let mut moves: Vec<Coord>;
-    {
-        moves = all_possible_moves(turn);
+    if moves == 0 {
+        let (score, mut line) = ai_eval_iddfs_internal(opp, my, depth);
+        line.push(Coord::new(8, 8)); // Pass
+        return (negate_score(score), line);
     }
-    
     // If everything is alright, turn shouldn't be ended
     // assert!(!turn.is_endgame());
     
     let mut scores: Vec<(Vec<Coord>, Score)> = Vec::new();
     
-    while let Some(coord) = moves.pop() {
-        let mut turn_after_move = *turn;
-        turn_after_move.make_move(coord)?;
-        scores.push(match turn_after_move.get_state() {
-            _ => {
-                let (new_score, mut line) = try!(ai_eval_iddfs_internal(&turn_after_move, depth - 1));
-                line.push(coord);
-                (line, new_score)
-            }
-        });
+    while moves != 0 {
+        let disk = 1u64 << moves.trailing_zeros();
+        moves ^= disk;
+        let (nmy, nopp) = bit_board::move_bit_board(my, opp, disk);
+        let (new_score, mut line)
+            = ai_eval_iddfs_internal(nopp, nmy, depth - 1);
+        line.push(disk_to_coord(disk));
+        scores.push((line, new_score));
     }
     
-    let (line, score) = match turn.get_state() {
-        Some(Side::Dark) => scores.into_iter().min_by_key(|&(_, score)| score).expect("Why should this fail?"),
-        Some(Side::Light) => scores.into_iter().max_by_key(|&(_, score)| score).expect("Why should this fail?"),
-        None => unreachable!("turn is ended but it should not be"),
-    };
-    Ok((score, line))
+    let (line, score) = scores.into_iter().min_by_key(|&(_, score)| score).expect("Why should this fail?");
+    (negate_score(score), line)
 }
 
-fn ai_eval_till_end(turn: &turn::Turn, moves: &[Coord],
-                      moves_and_scores: &mut Vec<(Coord, Score)>, side: Side) {
+fn ai_eval_till_end(my: u64, opp: u64, moves: u64,
+                      moves_and_scores: &mut Vec<(Coord, Score)>) {
     let mut moves_scores_lines = Vec::new();
     moves_and_scores.clear();
-    for &mv in moves.iter() {
-        let mut turn_after_move = *turn;
-        turn_after_move
-            .make_move(mv)
-            .expect("The move was checked, but something went wrong!");
-        let (score, line) =
-            ai_eval_till_end_internal(&turn_after_move)
-            .expect("Something went wrong with `ai_eval_till_end_internal`!");
-        moves_scores_lines.push((mv, score, line));
-        let prunable =
-            match turn.get_state() {
-                Some(Side::Dark) =>
-                    score < 0,
-                Some(Side::Light) =>
-                    score > 0,
-                None => unreachable!(),
-            };
-        if prunable {
+    let mut moves = moves;
+    while moves != 0 {
+        let disk = 1u64 << moves.trailing_zeros();
+        moves ^= disk;
+        let (nmy, nopp) = bit_board::move_bit_board(my, opp, disk);
+        let (score, mut line) =
+            ai_eval_till_end_internal(nopp, nmy);
+        line.reverse();
+        moves_scores_lines.push((disk_to_coord(disk), score, line));
+        if score < 0 {
             break;
         }
     }
     moves_scores_lines.sort_by_key(|&(_, score, _)| score);
-    if side == Side::Light {
-        moves_scores_lines.reverse();
-    }
-    eprintln!("evals[depth = {} (full)]:", 63 - turn.get_tempo());
+    eprintln!("evals[depth = {} (full)]:", 63 - bit_board::get_tempo(my, opp));
     for i in 0 .. ::std::cmp::min(4, moves_scores_lines.len()) {
         let (mv, score, line) = moves_scores_lines[i].clone();
-        eprintln!("{:?}: {}{}", score, coord_to_string(mv),
+        eprintln!("{:?}: {}{}", -score, coord_to_string(mv),
                   line_to_string(&line));
     }
     *moves_and_scores = moves_scores_lines.into_iter()
@@ -192,88 +201,61 @@ fn ai_eval_till_end(turn: &turn::Turn, moves: &[Coord],
 
 
 // Check only if it's winning or not
-fn ai_eval_till_end_internal(turn: &turn::Turn)
-                    -> Result<(i16, Vec<Coord>)> {
-    match turn.get_state() {
-        None => return Ok((turn.get_score_diff(), Vec::new())),
-        _ => (),
+fn ai_eval_till_end_internal(my: u64, opp: u64)
+                    -> (i16, Vec<Coord>) {
+    let mut moves = bit_board::valid_moves_set(my, opp);
+    let oppmoves = bit_board::valid_moves_set(opp, my);
+    if moves == 0 && oppmoves == 0 {
+        return (get_score_diff(my, opp), Vec::new());
     }
 
-    // Finds all possible legal moves and records their coordinates
-    let mut moves: Vec<Coord>;
-    {
-        moves = all_possible_moves(turn);
+    if moves == 0 {
+        let (score, mut line) = ai_eval_till_end_internal(opp, my);
+        line.push(Coord::new(8, 8)); // Pass
+        return (-score, line);
     }
-    
-    // If everything is alright, turn shouldn't be ended
-    // assert!(!turn.is_endgame());
-    
+
     let mut scores: Vec<(Vec<Coord>, i16)> = Vec::new();
     
-    while let Some(coord) = moves.pop() {
-        let mut turn_after_move = *turn;
-        turn_after_move.make_move(coord)?;
-        let (newline, new_score) = match turn_after_move.get_state() {
-            _ => {
-                let (new_score, mut line) = try!(ai_eval_till_end_internal(&turn_after_move));
-                line.push(coord);
-                (line, new_score)
-            }
-        };
+    while moves != 0 {
+        let disk = 1u64 << moves.trailing_zeros();
+        moves ^= disk;
+        let (nmy, nopp) = bit_board::move_bit_board(my, opp, disk);
+        let (new_score, mut newline) =
+            ai_eval_till_end_internal(nopp, nmy);
+        newline.push(disk_to_coord(disk));
         scores.push((newline, new_score));
-        let prunable =
-            match turn.get_state() {
-                Some(Side::Dark) =>
-                    new_score < 0,
-                Some(Side::Light) => new_score > 0,
-                None => unreachable!(),
-            };
-        if prunable {
+        if new_score < 0 { // Opponent always lose, no need to search more
             break;
         }
     }
-    
-    let (line, score) = match turn.get_state() {
-        Some(Side::Dark) => scores.into_iter().min_by_key(|&(_, score)| score).expect("Why should this fail?"),
-        Some(Side::Light) => scores.into_iter().max_by_key(|&(_, score)| score).expect("Why should this fail?"),
-        None => unreachable!("turn is ended but it should not be"),
-    };
-    Ok((score, line))
+
+    let (line, score) = scores.into_iter().min_by_key(|&(_, score)| score).expect("Why should this fail?");
+    (-score, line)
 }
 
-fn my_board_eval(turn: &turn::Turn) -> Result<f64> {
-    assert!(!turn.is_end_state());
-    let side = turn.get_state().unwrap();
-
-    let turns = turn.get_tempo();
-    let mut val = AiPlayer::heavy_eval(turn)?;
-    if turns <= 35 {
-        val = 0.0;
-        let mylegit = all_possible_moves(turn).len();
-        if side == Side::Light {
-            val += mylegit as f64 / 2.0;
-        } else {
-            val -= mylegit as f64 / 2.0;
-        }
-        let edges = [(0, 0, 1, 0), (7, 0, 0, 1), (0, 0, 0, 1), (0, 7, 1, 0)];
-        for &(sx, sy, dx, dy) in edges.iter() {
-            let mut white = 0;
-            let mut black = 0;
-            for i in 0 .. 8 {
-                let x = sx + i * dx;
-                let y = sy + i * dy;
-                match *(turn.get_cell(Coord::new(x, y))?) {
-                    None => (),
-                    Some(disk) => match disk.get_side() {
-                        Side::Light => white |= 1 << i,
-                        Side::Dark => black |= 1 << i,
-                    },
-                };
+fn my_board_eval(my: u64, opp: u64) -> f64 {
+    let mut val = 0.0;
+    let mylegit = bit_board::valid_moves_set(my, opp).count_ones();
+    val += mylegit as f64 / 2.0;
+    let edges = [(0, 0, 1, 0), (7, 0, 0, 1), (0, 0, 0, 1), (0, 7, 1, 0)];
+    for &(sx, sy, dx, dy) in edges.iter() {
+        let mut white = 0;
+        let mut black = 0;
+        for i in 0 .. 8 {
+            let x = sx + i * dx;
+            let y = sy + i * dy;
+            let idx = 8 * x + y;
+            if (my & 1u64 << idx) != 0 {
+                black |= 1u8 << i;
             }
-            val += eval_edge(white) - eval_edge(black);
+            if (opp & 1u64 << idx) != 0 {
+                white |= 1u8 << i;
+            }
         }
+        val += eval_edge(black) - eval_edge(white);
     }
-    Ok(val)
+    val
 }
 
 fn eval_edge(pat: u8) -> f64 {
@@ -287,15 +269,19 @@ fn eval_edge(pat: u8) -> f64 {
 }
 
 
-fn all_possible_moves(turn: &turn::Turn) -> Vec<Coord> {
-    let mut moves: Vec<Coord> = Vec::new();
-    for row in 0..board::BOARD_SIZE {
-        for col in 0..board::BOARD_SIZE {
-            let coord = board::Coord::new(row, col);
-            if turn.check_move(coord).is_ok() {
-                moves.push(coord);
-            }
-        }
+fn get_score_diff(my: u64, opp: u64) -> i16 {
+    my.count_ones() as i16 - opp.count_ones() as i16
+}
+
+fn negate_score(s: Score) -> Score {
+    match s {
+        Score::Running(f) => Score::Running(-f),
+        Score::Ended(d) => Score::Ended(-d),
     }
-    moves
+}
+
+fn disk_to_coord(disk: u64) -> Coord {
+    assert_eq!(disk.count_ones(), 1);
+    let idx = disk.trailing_zeros();
+    Coord::new((idx / 8) as usize, (idx % 8) as usize)
 }
