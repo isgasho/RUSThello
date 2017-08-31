@@ -238,14 +238,12 @@ fn my_board_eval(my: u64, opp: u64) -> f64 {
     let mut val = 0.0;
     let mylegit = bit_board::valid_moves_set(my, opp).count_ones();
     val += mylegit as f64 / 2.0;
-    let edges = [(0, 0, 1, 0), (7, 0, 0, 1), (0, 0, 0, 1), (0, 7, 1, 0)];
-    for &(sx, sy, dx, dy) in edges.iter() {
+    let edges = [(0, 1), (0, 8), (7, 8), (56, 1)];
+    for &(s, d) in edges.iter() {
         let mut white = 0;
         let mut black = 0;
         for i in 0 .. 8 {
-            let x = sx + i * dx;
-            let y = sy + i * dy;
-            let idx = 8 * x + y;
+            let idx = s + i * d;
             if (my & 1u64 << idx) != 0 {
                 black |= 1u8 << i;
             }

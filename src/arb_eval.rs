@@ -15,8 +15,7 @@ extern crate reversi;
 use reversi::game::{PlayerAction, IsPlayer, Game};
 use rusthello_lib::{custom_ai, bit_board};
 use rusthello_lib::bit_board::BitBoard;
-use std::cmp::Ordering;
-use std::time::{Instant};
+// use std::time::{Instant};
 
 fn read_board() -> bit_board::BitBoard {
     let stdin = ::std::io::stdin();
@@ -48,8 +47,8 @@ fn main() {
     println!("Evaluation by custom ai");
     let board = read_board();
     println!("{}", bit_board::show_bit_board(board));
-    let BitBoard(bl, wh, _turn) = board;
     /*
+    let BitBoard(bl, wh, _turn) = board;
     let valid_moves = bit_board::valid_moves_set(bl, wh);
     let pick_one = valid_moves.trailing_zeros();
     assert!(pick_one < 64);
