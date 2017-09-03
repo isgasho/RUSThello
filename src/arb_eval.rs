@@ -61,21 +61,23 @@ fn main() {
         let mut moves_and_scores = Vec::new();
         let moves = bit_board::valid_moves_set(my, opp);
         let start = Instant::now();
+        let mut nnodes = 0;
         custom_ai::ai_eval_till_end(my, opp, moves, &mut moves_and_scores,
-                                    true);
+                                    true, &mut nnodes);
         let end = start.elapsed();
         let end = end.as_secs() as f64 +
             end.subsec_nanos() as f64 * 1e-9;
         println!("Lock analysis: {}sec", end);
-        if true {
-            let start = Instant::now();
-            custom_ai::ai_eval_till_end(my, opp, moves, &mut moves_and_scores,
-                                        false);
-            let end = start.elapsed();
-            let end = end.as_secs() as f64 +
-                end.subsec_nanos() as f64 * 1e-9;
-            println!("Full analysis: {}sec", end);
-        }
+        println!("#Nodes = {}", nnodes);
+        let start = Instant::now();
+        nnodes = 0;
+        custom_ai::ai_eval_till_end(my, opp, moves, &mut moves_and_scores,
+                                    false, &mut nnodes);
+        let end = start.elapsed();
+        let end = end.as_secs() as f64 +
+            end.subsec_nanos() as f64 * 1e-9;
+        println!("Full analysis: {}sec", end);
+        println!("#Nodes = {}", nnodes);
     }
     // custom_ai::find_best_move_custom(&turn).unwrap();
 }
