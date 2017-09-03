@@ -243,7 +243,6 @@ fn ai_eval_till_end_internal(my: u64, opp: u64, alpha: i16, beta: i16,
         line.push(Coord::new(8, 8)); // Pass
         return (-score, line, false);
     }
-    let mut scores: Vec<(Vec<Coord>, i16)> = Vec::new();
 
     let mut disks = Vec::with_capacity(moves.count_ones() as usize);
     while moves != 0 {
@@ -255,30 +254,30 @@ fn ai_eval_till_end_internal(my: u64, opp: u64, alpha: i16, beta: i16,
     }
     disks.sort();
     let mut ma = alpha;
+    let mut line = Vec::new();
+    let mut found = false;
     for (_, disk) in disks {
         let (nmy, nopp) = bit_board::move_bit_board(my, opp, disk);
         let (new_score, mut newline, defunct) =
             ai_eval_till_end_internal(nopp, nmy, -beta, -ma, pruning,
                                       nnodes);
-        ma = max(ma, -new_score);
+        if ma < -new_score {
+            ma = max(ma, -new_score);
+            if !defunct {
+                newline.push(disk_to_coord(disk));
+                line = newline;
+                found = true;
+            }
+        }
         if ma >= beta {
             return (ma, Vec::new(), true);
-        }
-        if !defunct {
-            newline.push(disk_to_coord(disk));
-            scores.push((newline, new_score));
         }
         // Opponent always lose, no need to search more in lock mode
         if pruning && new_score < 0 {
             break;
         }
     }
-
-    if scores.len() == 0 {
-        return (ma, Vec::new(), true);
-    }
-    let (line, score) = scores.into_iter().min_by_key(|&(_, score)| score).expect("Why should this fail?");
-    (-score, line, false)
+    (ma, line, !found)
 }
 
 fn my_board_eval(my: u64, opp: u64) -> f64 {
