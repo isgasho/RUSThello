@@ -14,7 +14,7 @@ extern crate reversi;
 
 use rusthello_lib::{custom_ai, bit_board};
 use rusthello_lib::bit_board::BitBoard;
-// use std::time::{Instant};
+use std::time::{Instant};
 
 fn read_board() -> bit_board::BitBoard {
     let stdin = ::std::io::stdin();
@@ -45,16 +45,37 @@ fn main() {
     // Main intro
     println!("Evaluation by custom ai");
     let board = read_board();
+    let BitBoard(bl, wh, turn) = board;
+    let my = if turn { bl } else { wh };
+    let opp = if turn { wh } else { bl };
     println!("{}", bit_board::show_bit_board(board));
-    /*
-    let BitBoard(bl, wh, _turn) = board;
-    let valid_moves = bit_board::valid_moves_set(bl, wh);
-    let pick_one = valid_moves.trailing_zeros();
-    assert!(pick_one < 64);
-    let pick_one = 1u64 << pick_one;
-    let (nbl, nwh) = bit_board::move_bit_board(bl, wh, pick_one);
-    println!("{}", bit_board::show_bit_board(BitBoard(nbl, nwh, false)));
-     */
+    let start = Instant::now();
     custom_ai::find_best_move_bit_board(board);
+    let end = start.elapsed();
+    let end = end.as_secs() as f64 +
+        end.subsec_nanos() as f64 * 1e-9;
+    println!("Analysis: {}sec", end);
+    // full analysis
+    if bit_board::get_tempo(my, opp) >= 43 {
+        let depth = 63 - bit_board::get_tempo(my, opp) as usize;
+        let mut moves_and_scores = Vec::new();
+        let moves = bit_board::valid_moves_set(my, opp);
+        let start = Instant::now();
+        custom_ai::ai_eval_till_end(my, opp, moves, &mut moves_and_scores,
+                                    true);
+        let end = start.elapsed();
+        let end = end.as_secs() as f64 +
+            end.subsec_nanos() as f64 * 1e-9;
+        println!("Lock analysis: {}sec", end);
+        if depth <= 16 {
+            let start = Instant::now();
+            custom_ai::ai_eval_till_end(my, opp, moves, &mut moves_and_scores,
+                                        false);
+            let end = start.elapsed();
+            let end = end.as_secs() as f64 +
+                end.subsec_nanos() as f64 * 1e-9;
+            println!("Full analysis: {}sec", end);
+        }
+    }
     // custom_ai::find_best_move_custom(&turn).unwrap();
 }
