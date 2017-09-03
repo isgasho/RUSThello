@@ -220,14 +220,15 @@ fn ai_eval_till_end_internal(my: u64, opp: u64, alpha: i16, beta: i16, pruning: 
     let mut moves = bit_board::valid_moves_set(my, opp);
     let oppmoves = bit_board::valid_moves_set(opp, my);
     if moves == 0 && oppmoves == 0 {
-        return (get_score_diff(my, opp), Vec::new(), false);
+        let score = get_score_diff(my, opp);
+        return (score, Vec::new(), false);
     }
 
     if moves == 0 {
         let (score, mut line, defunct) = ai_eval_till_end_internal(opp, my,
         -beta, -alpha, pruning);
         if defunct {
-            return (alpha, Vec::new(), true);
+            return (-score, Vec::new(), true);
         }
         line.push(Coord::new(8, 8)); // Pass
         return (-score, line, false);
@@ -257,7 +258,7 @@ fn ai_eval_till_end_internal(my: u64, opp: u64, alpha: i16, beta: i16, pruning: 
             newline.push(disk_to_coord(disk));
             scores.push((newline, new_score));
         }
-        // Opponent always lose, no need to search more
+        // Opponent always lose, no need to search more in lock mode
         if pruning && new_score < 0 {
             break;
         }
