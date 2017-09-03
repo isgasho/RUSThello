@@ -56,7 +56,7 @@ fn main() {
         end.subsec_nanos() as f64 * 1e-9;
     println!("Analysis: {}sec", end);
     // full analysis
-    if bit_board::get_tempo(my, opp) >= 43 {
+    if bit_board::get_tempo(my, opp) >= 40 {
         let depth = 63 - bit_board::get_tempo(my, opp) as usize;
         let mut moves_and_scores = Vec::new();
         let moves = bit_board::valid_moves_set(my, opp);
@@ -67,7 +67,7 @@ fn main() {
         let end = end.as_secs() as f64 +
             end.subsec_nanos() as f64 * 1e-9;
         println!("Lock analysis: {}sec", end);
-        if depth <= 16 {
+        if true {
             let start = Instant::now();
             custom_ai::ai_eval_till_end(my, opp, moves, &mut moves_and_scores,
                                         false);
