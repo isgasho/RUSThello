@@ -7,6 +7,7 @@ extern crate rand;
 extern crate rayon;
 extern crate reversi;
 extern crate termion;
+extern crate smallvec;
 
 // Modules
 pub mod interface;

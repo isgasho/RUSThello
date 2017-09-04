@@ -24,6 +24,7 @@ clippy = {version = "*", optional = true}
 rand="0.3.*"
 rayon="0.8.*"
 termion="1.4.*"
+smallvec="0.4.*"
 
 [dependencies.reversi]
 version = "0.5.*"

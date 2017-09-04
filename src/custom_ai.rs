@@ -10,6 +10,10 @@ use bit_board::BitBoard;
 
 use std::cmp::max;
 
+use smallvec::SmallVec;
+
+type SVec<T> = SmallVec<[T; 16]>;
+
 const RANDOMNESS: f64 = 0.05f64;
 
 const USUAL_DEPTH: usize = 5;
@@ -99,7 +103,7 @@ pub fn find_best_move_bit_board(BitBoard(bl, wh, turn): BitBoard)
 
 pub fn ai_eval_with_depth(my: u64, opp: u64, depth: usize, moves: u64,
                       moves_and_scores: &mut Vec<(Coord, Score)>) {
-    let mut moves_scores_lines = Vec::new();
+    let mut moves_scores_lines = SVec::new();
     moves_and_scores.clear();
     let mut restmoves = moves;
     while restmoves != 0 {
@@ -122,7 +126,7 @@ pub fn ai_eval_with_depth(my: u64, opp: u64, depth: usize, moves: u64,
 }
 
 fn ai_eval_iddfs(my: u64, opp: u64, depth: usize)
-                 -> (Score, Vec<Coord>) {
+                 -> (Score, SVec<Coord>) {
     let (mut score, mut line) = ai_eval_iddfs_internal(my, opp, depth);
     // Add some randomness
     let between = Range::new(-RANDOMNESS, RANDOMNESS);
@@ -137,15 +141,15 @@ fn ai_eval_iddfs(my: u64, opp: u64, depth: usize)
 }
 
 fn ai_eval_iddfs_internal(my: u64, opp: u64, depth: usize)
-                          -> (Score, Vec<Coord>) {
+                          -> (Score, SVec<Coord>) {
     let mut moves = bit_board::valid_moves_set(my, opp);
     let oppmoves = bit_board::valid_moves_set(opp, my);
     if moves == 0 && oppmoves == 0 {
-        return (Score::Ended(get_score_diff(my, opp)), Vec::new());
+        return (Score::Ended(get_score_diff(my, opp)), SVec::new());
     }
     if depth == 0 {
         return
-            (Score::Running(my_board_eval(my, opp)), Vec::new());
+            (Score::Running(my_board_eval(my, opp)), SVec::new());
     }
 
     if moves == 0 {
@@ -156,7 +160,7 @@ fn ai_eval_iddfs_internal(my: u64, opp: u64, depth: usize)
     // If everything is alright, turn shouldn't be ended
     // assert!(!turn.is_endgame());
     
-    let mut scores: Vec<(Vec<Coord>, Score)> = Vec::new();
+    let mut scores: SVec<(SVec<Coord>, Score)> = SVec::new();
     
     while moves != 0 {
         let disk = 1u64 << moves.trailing_zeros();
@@ -176,10 +180,10 @@ pub fn ai_eval_till_end(my: u64, opp: u64, moves: u64,
                         moves_and_scores: &mut Vec<(Coord, Score)>,
                         pruning: bool,
                         nnodes: &mut u64) {
-    let mut moves_scores_lines = Vec::new();
+    let mut moves_scores_lines = SVec::new();
     moves_and_scores.clear();
     let mut moves = moves;
-    let mut disks = Vec::with_capacity(moves.count_ones() as usize);
+    let mut disks = SVec::new();
     while moves != 0 {
         let disk = 1u64 << moves.trailing_zeros();
         moves ^= disk;
@@ -212,7 +216,7 @@ pub fn ai_eval_till_end(my: u64, opp: u64, moves: u64,
               if pruning { "lock" } else { "full" });
     for i in 0 .. ::std::cmp::min(4, moves_scores_lines.len()) {
         let (mv, score, line) = moves_scores_lines[i].clone();
-        let line: Vec<_> = line.into_iter().map(|x| disk_to_coord(x)).collect();
+        let line: SVec<_> = line.into_iter().map(|x| disk_to_coord(x)).collect();
         eprintln!("{:?}: {}{}", -score, coord_to_string(mv),
                   line_to_string(&line));
     }
@@ -226,26 +230,26 @@ pub fn ai_eval_till_end(my: u64, opp: u64, moves: u64,
 fn ai_eval_till_end_internal(my: u64, opp: u64, alpha: i16, beta: i16,
                              pruning: bool,
                              nnodes: &mut u64)
-                             -> (i16, Vec<u64>, bool) {
+                             -> (i16, SVec<u64>, bool) {
     *nnodes += 1;
     let mut moves = bit_board::valid_moves_set(my, opp);
     let oppmoves = bit_board::valid_moves_set(opp, my);
     if moves == 0 && oppmoves == 0 {
         let score = get_score_diff(my, opp);
-        return (score, Vec::new(), false);
+        return (score, SVec::new(), false);
     }
 
     if moves == 0 {
         let (score, mut line, defunct) = ai_eval_till_end_internal(opp, my,
         -beta, -alpha, pruning, nnodes);
         if defunct {
-            return (-score, Vec::new(), true);
+            return (-score, SVec::new(), true);
         }
         line.push(0); // Pass
         return (-score, line, false);
     }
 
-    let mut disks = Vec::with_capacity(moves.count_ones() as usize);
+    let mut disks = SVec::new();
     while moves != 0 {
         let disk = 1u64 << moves.trailing_zeros();
         moves ^= disk;
@@ -255,7 +259,7 @@ fn ai_eval_till_end_internal(my: u64, opp: u64, alpha: i16, beta: i16,
     }
     disks.sort();
     let mut ma = alpha;
-    let mut line = Vec::new();
+    let mut line = SVec::new();
     let mut found = false;
     for (_, disk) in disks {
         let (nmy, nopp) = bit_board::move_bit_board(my, opp, disk);
@@ -271,7 +275,7 @@ fn ai_eval_till_end_internal(my: u64, opp: u64, alpha: i16, beta: i16,
             }
         }
         if ma >= beta {
-            return (ma, Vec::new(), true);
+            return (ma, SVec::new(), true);
         }
         // Opponent always lose, no need to search more in lock mode
         if pruning && new_score < 0 {
