@@ -114,7 +114,7 @@ pub fn ai_eval_with_depth(my: u64, opp: u64, depth: usize, moves: u64,
             ai_eval_iddfs(nopp, nmy, depth);
         moves_scores_lines.push((disk_to_coord(disk), score, line));
     }
-    moves_scores_lines.sort_by_key(|&(_, score, _)| score);
+    moves_scores_lines.sort_unstable_by_key(|&(_, score, _)| score);
     eprintln!("evals[depth = {}]:", depth);
     for i in 0 .. ::std::cmp::min(4, moves_scores_lines.len()) {
         let (mv, score, line) = moves_scores_lines[i].clone();
@@ -191,7 +191,7 @@ pub fn ai_eval_till_end(my: u64, opp: u64, moves: u64,
         let opp_moves = bit_board::valid_moves_set(nopp, nmy);
         disks.push((opp_moves.count_ones(), disk));
     }
-    disks.sort();
+    disks.sort_unstable();
     let mut ma = -1i16 << 10;
     for (_, disk) in disks {
         let mut nnodes_this = 0;
@@ -211,7 +211,7 @@ pub fn ai_eval_till_end(my: u64, opp: u64, moves: u64,
             break;
         }
     }
-    moves_scores_lines.sort_by_key(|&(_, score, _)| score);
+    moves_scores_lines.sort_unstable_by_key(|&(_, score, _)| score);
     eprintln!("evals[depth = {} ({})]:", 63 - bit_board::get_tempo(my, opp),
               if pruning { "lock" } else { "full" });
     for i in 0 .. ::std::cmp::min(4, moves_scores_lines.len()) {
@@ -257,7 +257,7 @@ fn ai_eval_till_end_internal(my: u64, opp: u64, alpha: i16, beta: i16,
         let opp_moves = bit_board::valid_moves_set(nopp, nmy);
         disks.push((opp_moves.count_ones(), disk));
     }
-    disks.sort();
+    disks.sort_unstable();
     let mut ma = alpha;
     let mut line = SVec::new();
     let mut found = false;
