@@ -57,7 +57,6 @@ fn main() {
     println!("Analysis: {}sec", end);
     // full analysis
     if bit_board::get_tempo(my, opp) >= 40 {
-        let depth = 63 - bit_board::get_tempo(my, opp) as usize;
         let mut moves_and_scores = Vec::new();
         let moves = bit_board::valid_moves_set(my, opp);
         let start = Instant::now();

@@ -212,6 +212,7 @@ pub fn ai_eval_till_end(my: u64, opp: u64, moves: u64,
               if pruning { "lock" } else { "full" });
     for i in 0 .. ::std::cmp::min(4, moves_scores_lines.len()) {
         let (mv, score, line) = moves_scores_lines[i].clone();
+        let line: Vec<_> = line.into_iter().map(|x| disk_to_coord(x)).collect();
         eprintln!("{:?}: {}{}", -score, coord_to_string(mv),
                   line_to_string(&line));
     }
@@ -225,7 +226,7 @@ pub fn ai_eval_till_end(my: u64, opp: u64, moves: u64,
 fn ai_eval_till_end_internal(my: u64, opp: u64, alpha: i16, beta: i16,
                              pruning: bool,
                              nnodes: &mut u64)
-                             -> (i16, Vec<Coord>, bool) {
+                             -> (i16, Vec<u64>, bool) {
     *nnodes += 1;
     let mut moves = bit_board::valid_moves_set(my, opp);
     let oppmoves = bit_board::valid_moves_set(opp, my);
@@ -240,7 +241,7 @@ fn ai_eval_till_end_internal(my: u64, opp: u64, alpha: i16, beta: i16,
         if defunct {
             return (-score, Vec::new(), true);
         }
-        line.push(Coord::new(8, 8)); // Pass
+        line.push(0); // Pass
         return (-score, line, false);
     }
 
@@ -262,9 +263,9 @@ fn ai_eval_till_end_internal(my: u64, opp: u64, alpha: i16, beta: i16,
             ai_eval_till_end_internal(nopp, nmy, -beta, -ma, pruning,
                                       nnodes);
         if ma < -new_score {
-            ma = max(ma, -new_score);
+            ma = -new_score;
             if !defunct {
-                newline.push(disk_to_coord(disk));
+                newline.push(disk);
                 line = newline;
                 found = true;
             }
@@ -325,6 +326,9 @@ fn negate_score(s: Score) -> Score {
 }
 
 fn disk_to_coord(disk: u64) -> Coord {
+    if disk == 0 {
+        return Coord::new(8, 8);
+    }
     assert_eq!(disk.count_ones(), 1);
     let idx = disk.trailing_zeros();
     Coord::new((idx / 8) as usize, (idx % 8) as usize)
