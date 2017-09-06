@@ -17,7 +17,7 @@ type SVec<T> = SmallVec<[T; 16]>;
 const RANDOMNESS: f64 = 0.05f64;
 
 const USUAL_DEPTH: usize = 5;
-const ENDGAME_LENGTH: usize = 17;
+const ENDGAME_LENGTH: usize = 19;
 
 fn coord_to_string(c: Coord) -> String {
     let (r, c) = c.get_row_col();
@@ -143,8 +143,7 @@ fn ai_eval_iddfs(my: u64, opp: u64, depth: usize)
 fn ai_eval_iddfs_internal(my: u64, opp: u64, depth: usize)
                           -> (Score, SVec<Coord>) {
     let mut moves = bit_board::valid_moves_set(my, opp);
-    let oppmoves = bit_board::valid_moves_set(opp, my);
-    if moves == 0 && oppmoves == 0 {
+    if moves == 0 && bit_board::valid_moves_set(opp, my) == 0 {
         return (Score::Ended(get_score_diff(my, opp)), SVec::new());
     }
     if depth == 0 {
