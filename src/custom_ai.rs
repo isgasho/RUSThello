@@ -188,13 +188,12 @@ pub fn ai_eval_till_end(my: u64, opp: u64, moves: u64,
         moves ^= disk;
         let (nmy, nopp) = bit_board::move_bit_board(my, opp, disk);
         let opp_moves = bit_board::valid_moves_set(nopp, nmy);
-        disks.push((opp_moves.count_ones(), disk));
+        disks.push((opp_moves.count_ones(), disk, nopp, nmy));
     }
-    disks.sort_unstable();
+    disks.sort_unstable_by_key(|&(sc, _, _, _)| sc);
     let mut ma = -1i16 << 10;
-    for (_, disk) in disks {
+    for (_, disk, nopp, nmy) in disks {
         let mut nnodes_this = 0;
-        let (nmy, nopp) = bit_board::move_bit_board(my, opp, disk);
         let (score, mut line, defunct) =
             ai_eval_till_end_internal(nopp, nmy, -1 << 10, -ma, pruning,
                                       &mut nnodes_this);
@@ -253,14 +252,13 @@ fn ai_eval_till_end_internal(my: u64, opp: u64, alpha: i16, beta: i16,
         moves ^= disk;
         let (nmy, nopp) = bit_board::move_bit_board(my, opp, disk);
         let opp_moves = bit_board::valid_moves_set(nopp, nmy);
-        disks.push((opp_moves.count_ones(), disk));
+        disks.push((opp_moves.count_ones(), disk, nopp, nmy));
     }
-    disks.sort_unstable();
+    disks.sort_unstable_by_key(|&(sc, _, _, _)| sc);
     let mut ma = alpha;
     let mut line = SVec::new();
     let mut found = false;
-    for (_, disk) in disks {
-        let (nmy, nopp) = bit_board::move_bit_board(my, opp, disk);
+    for (_, disk, nopp, nmy) in disks {
         let (new_score, mut newline, defunct) =
             ai_eval_till_end_internal(nopp, nmy, -beta, -ma, pruning,
                                       nnodes);
