@@ -233,8 +233,7 @@ fn ai_eval_till_end_internal(my: u64, opp: u64, alpha: i16, beta: i16,
                              -> (i16, SVec<u64>, bool) {
     *nnodes += 1;
     let mut moves = bit_board::valid_moves_set(my, opp);
-    let oppmoves = bit_board::valid_moves_set(opp, my);
-    if moves == 0 && oppmoves == 0 {
+    if moves == 0 && bit_board::valid_moves_set(opp, my) == 0 {
         let score = get_score_diff(my, opp);
         return (score, SVec::new(), false);
     }

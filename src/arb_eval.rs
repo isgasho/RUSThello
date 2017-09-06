@@ -68,6 +68,7 @@ fn main() {
             end.subsec_nanos() as f64 * 1e-9;
         println!("Lock analysis: {}sec", end);
         println!("#Nodes = {}", nnodes);
+        println!("NPS = {}k", nnodes as f64 / end / 1000.0);
         let start = Instant::now();
         nnodes = 0;
         custom_ai::ai_eval_till_end(my, opp, moves, &mut moves_and_scores,
@@ -77,6 +78,7 @@ fn main() {
             end.subsec_nanos() as f64 * 1e-9;
         println!("Full analysis: {}sec", end);
         println!("#Nodes = {}", nnodes);
+        println!("NPS = {}k", nnodes as f64 / end / 1000.0);
     }
     // custom_ai::find_best_move_custom(&turn).unwrap();
 }
