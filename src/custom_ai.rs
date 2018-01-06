@@ -9,6 +9,7 @@ use bit_board;
 use bit_board::BitBoard;
 
 use std::cmp::max;
+use std::collections::HashMap;
 
 use smallvec::SmallVec;
 
@@ -175,20 +176,35 @@ fn ai_eval_iddfs_internal(my: u64, opp: u64, depth: usize)
     (negate_score(score), line)
 }
 
+/*
+ * If moves_and_scores is not empty, it is a hint to the evaluator.
+ */
 pub fn ai_eval_till_end(my: u64, opp: u64, moves: u64,
                         moves_and_scores: &mut Vec<(Coord, Score)>,
                         pruning: bool,
                         nnodes: &mut u64) {
     let mut moves_scores_lines = SVec::new();
+    let mut disks = SVec::new();
+    let mut hint = HashMap::<u64, i32>::new();
+    // Never trust moves_and_scores. Just a hint
+    for &(coord, score) in moves_and_scores.iter() {
+        if let Score::Ended(diff) = score {
+            let disk = coord_to_disk(coord);
+            hint.insert(disk, diff as i32);
+        }
+    }
     moves_and_scores.clear();
     let mut moves = moves;
-    let mut disks = SVec::new();
     while moves != 0 {
         let disk = 1u64 << moves.trailing_zeros();
         moves ^= disk;
         let (nmy, nopp) = bit_board::move_bit_board(my, opp, disk);
         let opp_moves = bit_board::valid_moves_set(nopp, nmy);
-        disks.push((opp_moves.count_ones(), disk, nopp, nmy));
+        let mut eigen_score = opp_moves.count_ones() as i32;
+        if let Some(&evaluation) = hint.get(&disk) {
+            eigen_score = (evaluation << 16) - 1;
+        }
+        disks.push((eigen_score, disk, nopp, nmy));
     }
     disks.sort_unstable_by_key(|&(sc, _, _, _)| sc);
     let mut ma = -1i16 << 10;
@@ -332,4 +348,9 @@ fn disk_to_coord(disk: u64) -> Coord {
     assert_eq!(disk.count_ones(), 1);
     let idx = disk.trailing_zeros();
     Coord::new((idx / 8) as usize, (idx % 8) as usize)
+}
+fn coord_to_disk(coord: Coord) -> u64 {
+    let x = coord.get_row();
+    let y = coord.get_col();
+    1u64 << (8 * x + y)
 }
