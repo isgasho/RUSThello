@@ -21,10 +21,10 @@ path = "src/arb_eval.rs"
 
 [dependencies]
 clippy = {version = "*", optional = true}
-rand="0.3.*"
-rayon="0.8.*"
-termion="1.4.*"
-smallvec="0.4.*"
+rand="0.4.*"
+rayon="0.9.*"
+termion="1.5.*"
+smallvec="0.6.*"
 
 [dependencies.reversi]
 version = "0.5.*"
